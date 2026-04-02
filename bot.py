@@ -1,5 +1,6 @@
 import os
 import logging
+import tempfile
 import httpx
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
@@ -30,10 +31,8 @@ logger = logging.getLogger(__name__)
 client = TelegramClient("mi_cuenta", API_ID, API_HASH)
 
 
-async def send_to_whatsapp(text: str):
+async def send_text_to_whatsapp(text: str):
     """Envía un mensaje de texto al grupo de WhatsApp vía Green API."""
-    if not WHATSAPP_ENABLED:
-        return
     url = f"https://api.green-api.com/waInstance{GREEN_API_INSTANCE}/sendMessage/{GREEN_API_TOKEN}"
     payload = {
         "chatId": WHATSAPP_GROUP_ID,
@@ -43,9 +42,29 @@ async def send_to_whatsapp(text: str):
         async with httpx.AsyncClient() as http:
             resp = await http.post(url, json=payload, timeout=15)
             resp.raise_for_status()
-        logger.info("Mensaje enviado a WhatsApp")
+        logger.info("Texto enviado a WhatsApp")
     except Exception as e:
-        logger.error("Error al enviar a WhatsApp: %s", e)
+        logger.error("Error al enviar texto a WhatsApp: %s", e)
+
+
+async def send_file_to_whatsapp(file_path: str, filename: str, caption: str = ""):
+    """Envía un archivo (imagen, vídeo, documento…) al grupo de WhatsApp vía Green API."""
+    url = f"https://api.green-api.com/waInstance{GREEN_API_INSTANCE}/sendFileByUpload/{GREEN_API_TOKEN}"
+    try:
+        with open(file_path, "rb") as f:
+            data = {
+                "chatId": WHATSAPP_GROUP_ID,
+                "caption": caption,
+            }
+            files = {
+                "file": (filename, f),
+            }
+            async with httpx.AsyncClient() as http:
+                resp = await http.post(url, data=data, files=files, timeout=30)
+                resp.raise_for_status()
+        logger.info("Archivo enviado a WhatsApp: %s", filename)
+    except Exception as e:
+        logger.error("Error al enviar archivo a WhatsApp: %s", e)
 
 
 @client.on(events.NewMessage(chats=SOURCE_CHAT_ID))
@@ -60,16 +79,34 @@ async def forward_handler(event):
 
     # --- Reenviar a WhatsApp ---
     if WHATSAPP_ENABLED:
-        # Construir texto legible
         sender = await event.get_sender()
         sender_name = getattr(sender, "first_name", "") or getattr(
             sender, "title", "Desconocido"
         )
-        text = (
-            event.message.text or event.message.message or "[Media/archivo sin texto]"
-        )
-        wa_text = f"📩 *{sender_name}*:\n{text}"
-        await send_to_whatsapp(wa_text)
+        caption_prefix = f"📩 *{sender_name}*"
+        text = event.message.text or event.message.message or ""
+
+        if event.message.media:
+            # Descargar el archivo a un temporal y enviarlo
+            tmp_dir = tempfile.mkdtemp()
+            try:
+                downloaded = await event.message.download_media(file=tmp_dir)
+                if downloaded:
+                    filename = os.path.basename(downloaded)
+                    caption = f"{caption_prefix}:\n{text}" if text else caption_prefix
+                    await send_file_to_whatsapp(downloaded, filename, caption)
+                else:
+                    # No se pudo descargar, enviar solo texto
+                    wa_text = f"{caption_prefix}:\n{text or '[Media no descargable]'}"
+                    await send_text_to_whatsapp(wa_text)
+            finally:
+                # Limpiar archivos temporales
+                import shutil
+
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+        else:
+            wa_text = f"{caption_prefix}:\n{text}"
+            await send_text_to_whatsapp(wa_text)
 
 
 async def main():
