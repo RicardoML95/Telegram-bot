@@ -76,6 +76,11 @@ async def forward_handler(event):
     #     logger.info("Mensaje reenviado a Telegram (id=%s)", event.message.id)
     # except Exception as e:
     #     logger.error("Error al reenviar a Telegram: %s", e)
+    try:
+        await client.send_message(DEST_CHAT_ID, "New message in whatsapp")
+        logger.info("Aviso enviado a Telegram (id=%s)", event.message.id)
+    except Exception as e:
+        logger.error("Error al enviar aviso a Telegram: %s", e)
 
     # --- Reenviar a WhatsApp ---
     if WHATSAPP_ENABLED:
