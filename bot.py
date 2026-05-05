@@ -71,11 +71,11 @@ async def send_file_to_whatsapp(file_path: str, filename: str, caption: str = ""
 async def forward_handler(event):
     """Reenvía cada mensaje nuevo del grupo origen al grupo destino (Telegram + WhatsApp)."""
     # --- Reenviar a Telegram ---
-    try:
-        await event.message.forward_to(DEST_CHAT_ID)
-        logger.info("Mensaje reenviado a Telegram (id=%s)", event.message.id)
-    except Exception as e:
-        logger.error("Error al reenviar a Telegram: %s", e)
+    # try:
+    #     await event.message.forward_to(DEST_CHAT_ID)
+    #     logger.info("Mensaje reenviado a Telegram (id=%s)", event.message.id)
+    # except Exception as e:
+    #     logger.error("Error al reenviar a Telegram: %s", e)
 
     # --- Reenviar a WhatsApp ---
     if WHATSAPP_ENABLED:
@@ -113,7 +113,7 @@ async def main():
     await client.start(phone=PHONE)
     me = await client.get_me()
     logger.info("Sesión iniciada como %s (@%s)", me.first_name, me.username)
-    logger.info("Reenviando mensajes de %s → Telegram %s", SOURCE_CHAT_ID, DEST_CHAT_ID)
+    # logger.info("Reenviando mensajes de %s → Telegram %s", SOURCE_CHAT_ID, DEST_CHAT_ID)
     if WHATSAPP_ENABLED:
         logger.info("WhatsApp activado → grupo %s", WHATSAPP_GROUP_ID)
     else:
